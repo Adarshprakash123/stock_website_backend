@@ -127,8 +127,8 @@ router.post("/success", async (req, res) => {
     payment.paymentDetails = req.body;
     await payment.save();
 
-    // Redirect to home page with payment status
-    return res.redirect(redirectUrl);
+    // Redirect to home page with payment status and transaction ID
+    return res.redirect(`${frontendUrl}?payment_status=${status || 'failed'}${txnid ? `&txnid=${txnid}` : ''}`);
 
   } catch (error) {
     console.error("Success callback error:", error);
