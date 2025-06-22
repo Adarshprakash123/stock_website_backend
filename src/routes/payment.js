@@ -99,7 +99,7 @@ router.post("/success", async (req, res) => {
     const { txnid, status, hash, amount, productinfo, firstname, email, key } = req.body;
     
     // Always redirect to your frontend domain
-    const frontendUrl = "https://tradingwalla.com";
+    const frontendUrl = process.env.FRONTEND_URL || "https://tradingwalla.com";
     const redirectUrl = `${frontendUrl}?payment_status=${status || 'failed'}${txnid ? `&txnid=${txnid}` : ''}`;
     
     if (!txnid || !hash) {
