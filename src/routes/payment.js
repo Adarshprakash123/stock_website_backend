@@ -97,7 +97,7 @@ router.post("/success", async (req, res) => {
     const { txnid, status, hash, amount, productinfo, firstname, email, key } = req.body;
 
     const frontendUrl = process.env.FRONTEND_URL || "https://tradingwalla.com";
-    const redirectUrl = `${frontendUrl}?payment_status=${status || "failed"}${txnid ? `&txnid=${txnid}` : ""}`;
+    const redirectUrl = `${frontendUrl}?payment_status=${status === "success" ? "success" : "failed"}${txnid ? `&txnid=${txnid}` : ""}`;
 
     if (!txnid || !hash) {
       console.error("Missing required PayU params");
