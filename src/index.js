@@ -136,16 +136,20 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: function (origin, callback) {
+    // ✅ Allow if:
+    // - no origin (like in direct server-to-server calls from PayU)
+    // - or it's from allowed frontend
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error("Not allowed by CORS"));
+      console.warn("Blocked by CORS:", origin);
+      callback(null, false); // or: callback(new Error("Not allowed by CORS"));
     }
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "Accept"],
-  preflightContinue: true,
+  preflightContinue: false,
   optionsSuccessStatus: 204,
 };
 
