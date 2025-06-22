@@ -11,16 +11,18 @@ const app = express();
 
 // CORS Configuration
 const corsOptions = {
-  origin: [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:5000",
-    "http://127.0.0.1:5000",
-    process.env.FRONTEND_URL,
-  ],
+  origin: function (origin, callback) {
+    if (!origin || origin === process.env.FRONTEND_URL) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: ["Content-Type", "Authorization", "Accept"],
   credentials: true,
+  preflightContinue: true,
+  optionsSuccessStatus: 204,
 };
 
 // Middleware
