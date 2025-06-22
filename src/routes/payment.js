@@ -94,10 +94,17 @@ router.post("/create-payment-session", validatePayment, async (req, res) => {
 // PayU success callback
 router.post("/success", async (req, res) => {
   try {
+    console.log("Success callback received:", req.body);
+    
     const { txnid, status, hash, amount, productinfo, firstname, email, key } = req.body;
-
+    
+    // Always redirect to your frontend domain
+    const frontendUrl = "https://tradingwalla.com";
+    const redirectUrl = `${frontendUrl}?payment_status=${status || 'failed'}${txnid ? `&txnid=${txnid}` : ''}`;
+    
     if (!txnid || !hash) {
-      return res.status(400).json({ success: false, message: "Missing required parameters" });
+      console.error("Missing required parameters");
+      return res.redirect(redirectUrl);
     }
 
     const isProduction = process.env.NODE_ENV === "production";
@@ -106,27 +113,26 @@ router.post("/success", async (req, res) => {
     const calculatedHash = generateReverseHash({ status, email, firstname, productinfo, amount, txnid, key }, payuSalt);
 
     if (calculatedHash !== hash) {
-      return res.status(400).json({ success: false, message: "Hash mismatch. Possible tampering." });
+      console.error("Hash mismatch. Possible tampering.");
+      return res.redirect(redirectUrl);
     }
 
     const payment = await Payment.findOne({ txnid });
     if (!payment) {
-      return res.status(404).json({ success: false, message: "Payment not found" });
+      console.error("Payment not found");
+      return res.redirect(redirectUrl);
     }
 
     payment.status = status === "success" ? "succeeded" : "failed";
     payment.paymentDetails = req.body;
     await payment.save();
 
-    const isForm = req.headers["content-type"]?.includes("application/x-www-form-urlencoded");
-    if (isForm) {
-      return res.redirect(`${process.env.FRONTEND_URL}/payment/success?txnid=${txnid}&status=${status}`);
-    }
+    // Redirect to home page with payment status
+    return res.redirect(redirectUrl);
 
-    res.json({ success: true, data: payment });
   } catch (error) {
     console.error("Success callback error:", error);
-    res.status(500).json({ success: false, message: "Error in success callback" });
+    return res.redirect(`${frontendUrl}?payment_status=failed&error=${encodeURIComponent(error.message)}`);
   }
 });
 
