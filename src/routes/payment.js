@@ -97,11 +97,11 @@ router.post("/success", async (req, res) => {
     const { txnid, status, hash, amount, productinfo, firstname, email, key } = req.body;
 
     const frontendUrl = process.env.FRONTEND_URL || "https://tradingwalla.com";
-    const redirectUrl = `${frontendUrl}?payment_status=${status === "success" ? "success" : "failed"}${txnid ? `&txnid=${txnid}` : ""}`;
-
+    
+    // Check if we have the required parameters
     if (!txnid || !hash) {
       console.error("Missing required PayU params");
-      return res.redirect(redirectUrl);
+      return res.redirect(`${frontendUrl}?payment_status=failed&error=missing_params`);
     }
 
     const isProduction = process.env.NODE_ENV === "production";
@@ -137,31 +137,30 @@ router.post("/success", async (req, res) => {
     const payment = await Payment.findOne({ txnid });
     if (!payment) {
       console.error("Payment not found for txnid:", txnid);
-      return res.redirect(redirectUrl);
+      return res.redirect(`${frontendUrl}?payment_status=failed&error=payment_not_found`);
     }
 
-    // Update payment status
-    payment.status = status === "success" ? "succeeded" : "failed";
+    // Check if the payment status from PayU is success
+    if (status.toLowerCase() !== "success") {
+      payment.status = "failed";
+      payment.paymentDetails = req.body;
+      await payment.save();
+      return res.redirect(`${frontendUrl}?payment_status=failed&error=payment_declined`);
+    }
+
+    // Update payment status for successful payment
+    payment.status = "succeeded";
     payment.paymentDetails = req.body;
     await payment.save();
 
-    // Always redirect with the status we received from PayU
-    return res.redirect(`${frontendUrl}?payment_status=${status}${txnid ? `&txnid=${txnid}` : ""}`);
-    if (!payment) {
-      console.error("Payment not found for txnid:", txnid);
-      return res.redirect(redirectUrl);
-    }
-
-    payment.status = status === "success" ? "succeeded" : "failed";
-    payment.paymentDetails = req.body;
-    await payment.save();
-
-    return res.redirect(redirectUrl);
+    // Include WhatsApp group link for successful payments
+    const whatsappGroupLink = process.env.WHATSAPP_GROUP_LINK || "https://chat.whatsapp.com/your-group-link";
+    return res.redirect(`${frontendUrl}?payment_status=success&txnid=${txnid}&whatsapp_group=${encodeURIComponent(whatsappGroupLink)}`);
   } catch (error) {
-    console.error("Success callback error:", error);
-    const fallbackUrl = `${process.env.FRONTEND_URL}?payment_status=failed&error=${encodeURIComponent(error.message)}`;
-    return res.redirect(fallbackUrl);
+    console.error("Error in payment success route:", error);
+    return res.redirect(`${frontendUrl}?payment_status=failed&error=internal_error`);
   }
+
 });
 
 // ✅ Failure callback from PayU
