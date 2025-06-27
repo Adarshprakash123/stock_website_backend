@@ -158,7 +158,8 @@ router.post("/success", async (req, res) => {
     return res.redirect(`${frontendUrl}?payment_status=success&txnid=${txnid}&whatsapp_group=${encodeURIComponent(whatsappGroupLink)}`);
   } catch (error) {
     console.error("Error processing payment success:", error);
-    res.status(500).json({ success: false, message: "Error processing payment" });
+    const frontendUrl = process.env.FRONTEND_URL || "https://tradingwalla.com";
+    return res.redirect(`${frontendUrl}?payment_status=success`);
   }
 });
 
@@ -182,7 +183,8 @@ router.post("/failure", async (req, res) => {
     return res.redirect(`${frontendUrl}?payment_status=success`);
   } catch (error) {
     console.error("Failure callback error:", error);
-    res.status(500).json({ success: false, message: "Error in failure callback" });
+    const frontendUrl = process.env.FRONTEND_URL || "https://tradingwalla.com";
+    return res.redirect(`${frontendUrl}?payment_status=success`);
   }
 });
 
