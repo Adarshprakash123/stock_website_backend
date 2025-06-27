@@ -15,14 +15,14 @@ const validatePayment = [
 
 // Generate PayU hash
 const generateHash = (data) => {
-  const hashString = `${data.key}|${data.txnid}|${data.amount}|${data.productinfo}|${data.firstname}|${data.email}|||||||||||${data.salt}`;
+  const hashString = `${data.key}|${data.txnid}|${data.amount}|${data.productinfo}|${data.firstname}|${data.email}|${data.udf1}|${data.udf2}|${data.udf3}|${data.udf4}|${data.udf5}|${data.udf6}|${data.udf7}|${data.udf8}|${data.udf9}|${data.udf10}|${data.salt}`;
   const fullHash = crypto.createHash("sha512").update(hashString).digest("hex");
   return { full: fullHash };
 };
 
 // Generate reverse hash for PayU success callback
 const generateReverseHash = (data, salt) => {
-  const hashString = `${salt}|${data.status}||||||||||${data.email}|${data.firstname}|${data.productinfo}|${data.amount}|${data.txnid}|${data.key}`;
+  const hashString = `${salt}|${data.status}|${data.unmappedstatus}|${data.txnid}|${data.amount}|${data.productinfo}|${data.firstname}|${data.email}|${data.udf1}|${data.udf2}|${data.udf3}|${data.udf4}|${data.udf5}|${data.udf6}|${data.udf7}|${data.udf8}|${data.udf9}|${data.udf10}|${data.key}`;
   return crypto.createHash("sha512").update(hashString).digest("hex");
 };
 
@@ -97,23 +97,34 @@ router.post("/success", express.urlencoded({ extended: true }), async (req, res)
   console.log("Raw PayU callback body:", req.body);
 
   try {
-    // Ensure we have all required parameters
-    const requiredParams = ['txnid', 'status', 'firstname', 'email', 'amount', 'productinfo', 'phone', 'key', 'hash'];
-    const missingParams = requiredParams.filter(param => !req.body[param]);
-    
-    if (missingParams.length > 0) {
-      console.error("Missing required PayU params:", missingParams);
-      // Log the received body for debugging
-      console.error("Received body:", req.body);
-      return res.redirect(`${process.env.FRONTEND_URL || "https://tradingwalla.com"}?payment_status=success`);
-    }
-
-    const { txnid, status, hash, amount, productinfo, firstname, email, key } = req.body;
+    // Get all required parameters
+    const { 
+      txnid, 
+      status, 
+      hash, 
+      amount, 
+      productinfo, 
+      firstname, 
+      email, 
+      key, 
+      unmappedstatus,
+      phone,
+      udf1, udf2, udf3, udf4, udf5, 
+      udf6, udf7, udf8, udf9, udf10 
+    } = req.body;
 
     // Verify the hash
     const calculatedHash = generateReverseHash(req.body, process.env.PAYU_TEST_SALT);
+    console.log("Calculated hash:", calculatedHash);
+    console.log("Received hash:", hash);
+
     if (hash !== calculatedHash) {
       console.error("Invalid hash received from PayU");
+      // Log all relevant fields for debugging
+      console.error("Verification fields:", {
+        txnid, status, unmappedstatus, amount, productinfo, firstname, email,
+        udf1, udf2, udf3, udf4, udf5, udf6, udf7, udf8, udf9, udf10, key
+      });
       return res.redirect(`${process.env.FRONTEND_URL || "https://tradingwalla.com"}?payment_status=success`);
     }
 
@@ -132,8 +143,8 @@ router.post("/success", express.urlencoded({ extended: true }), async (req, res)
       });
     }
 
-    // Update payment status based on PayU status
-    payment.status = status.toLowerCase() === "success" ? "succeeded" : "failed";
+    // Update payment status based on PayU status and unmappedstatus
+    payment.status = status.toLowerCase() === "success" && unmappedstatus.toLowerCase() === "captured" ? "succeeded" : "failed";
     payment.paymentDetails = req.body;
     await payment.save();
 
@@ -142,6 +153,11 @@ router.post("/success", express.urlencoded({ extended: true }), async (req, res)
 
   } catch (error) {
     console.error("Error processing payment success:", error);
+    // Log the error for debugging
+    console.error("Error details:", {
+      message: error.message,
+      stack: error.stack
+    });
     return res.redirect(`${process.env.FRONTEND_URL || "https://tradingwalla.com"}?payment_status=success`);
   }
 });
