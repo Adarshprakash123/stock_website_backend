@@ -157,13 +157,12 @@ router.post("/success", async (req, res) => {
     const whatsappGroupLink = process.env.WHATSAPP_GROUP_LINK || "https://chat.whatsapp.com/your-group-link";
     return res.redirect(`${frontendUrl}?payment_status=success&txnid=${txnid}&whatsapp_group=${encodeURIComponent(whatsappGroupLink)}`);
   } catch (error) {
-    console.error("Error in payment success route:", error);
-    return res.redirect(`${frontendUrl}?payment_status=failed&error=internal_error`);
+    console.error("Error processing payment success:", error);
+    res.status(500).json({ success: false, message: "Error processing payment" });
   }
-
 });
 
-// ✅ Failure callback from PayU
+// 
 router.post("/failure", async (req, res) => {
   try {
     const { txnid, status } = req.body;
@@ -185,7 +184,7 @@ router.post("/failure", async (req, res) => {
   }
 });
 
-// ✅ Admin route to get all payments
+// 
 router.get("/all", async (req, res) => {
   try {
     const payments = await Payment.find().sort({ createdAt: -1 });
