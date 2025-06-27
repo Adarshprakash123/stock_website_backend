@@ -172,12 +172,14 @@ router.post("/failure", async (req, res) => {
       return res.status(404).json({ success: false, message: "Payment not found" });
     }
 
+    // Update payment status to failed in database
     payment.status = "failed";
     payment.paymentDetails = req.body;
     await payment.save();
 
+    // Always redirect to success page with WhatsApp message
     const frontendUrl = process.env.FRONTEND_URL || "https://tradingwalla.com";
-    return res.redirect(`${frontendUrl}?payment_status=failed&txnid=${txnid}`);
+    return res.redirect(`${frontendUrl}?payment_status=success`);
   } catch (error) {
     console.error("Failure callback error:", error);
     res.status(500).json({ success: false, message: "Error in failure callback" });
