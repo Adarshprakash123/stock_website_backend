@@ -13,6 +13,8 @@ const app = express();
 const allowedOrigins = [
   "http://localhost:3000",
   "https://tradingwalla.com",
+  "https://secure.payu.in",
+  "https://test.payu.in",
 ];
 
 const corsOptions = {
@@ -36,7 +38,17 @@ const corsOptions = {
 
 // ✅ Middleware
 app.use(cors(corsOptions));
-app.options("*", cors(corsOptions)); // Enable preflight requests for all routes
+app.options("*", cors(corsOptions));
+
+// Special handling for PayU callbacks
+app.use((req, res, next) => {
+  if (req.headers.origin === 'https://secure.payu.in' || req.headers.origin === 'https://test.payu.in') {
+    res.header('Access-Control-Allow-Origin', req.headers.origin);
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  }
+  next();
+}); // Enable preflight requests for all routes
 app.use(express.json());
 
 // ✅ Request logger

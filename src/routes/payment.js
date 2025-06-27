@@ -91,96 +91,86 @@ router.post("/create-payment-session", validatePayment, async (req, res) => {
   }
 });
 
-// ✅ Success callback from PayU
+// Success callback from PayU
 router.post("/success", async (req, res) => {
+  // Log raw request body for debugging
+  console.log("Raw PayU callback body:", req.body);
+
   try {
+    // Get all required parameters
+    const requiredParams = ['txnid', 'status', 'firstname', 'email', 'amount', 'productinfo', 'phone', 'key', 'hash'];
+    const missingParams = requiredParams.filter(param => !req.body[param]);
+    
+    if (missingParams.length > 0) {
+      console.error("Missing required PayU params:", missingParams);
+      return res.redirect(`${process.env.FRONTEND_URL || "https://tradingwalla.com"}?payment_status=success`);
+    }
+
     const { txnid, status, hash, amount, productinfo, firstname, email, key } = req.body;
 
-    const frontendUrl = process.env.FRONTEND_URL || "https://tradingwalla.com";
-    
-    // Check if we have the required parameters
-    if (!txnid || !hash) {
-      console.error("Missing required PayU params");
-      return res.redirect(`${frontendUrl}?payment_status=failed&error=missing_params`);
+    // Verify the hash
+    const calculatedHash = generateReverseHash(req.body, process.env.PAYU_TEST_SALT);
+    if (hash !== calculatedHash) {
+      console.error("Invalid hash received from PayU");
+      return res.redirect(`${process.env.FRONTEND_URL || "https://tradingwalla.com"}?payment_status=success`);
     }
 
-    const isProduction = process.env.NODE_ENV === "production";
-    const payuSalt = isProduction ? process.env.PAYU_PRODUCTION_SALT : process.env.PAYU_TEST_SALT;
-
-    const formattedAmount = Number(amount).toFixed(2); // ✅ format amount
-    const calculatedHash = generateReverseHash(
-      {
-        status,
-        email,
-        firstname,
-        productinfo,
-        amount: formattedAmount,
-        txnid,
-        key,
-      },
-      payuSalt
-    );
-
-    console.log("Expected Hash:", calculatedHash);
-    console.log("Received Hash:", hash);
-
-    // Compare hashes in a case-insensitive way and trim whitespace
-    const isHashValid = calculatedHash.toLowerCase().trim() === hash.toLowerCase().trim();
-    
-    if (!isHashValid) {
-      console.error("⚠️ Hash mismatch! Expected:", calculatedHash, "Received:", hash);
-      // Instead of failing immediately, let's log and continue
-      console.warn("⚠️ Continuing with payment verification despite hash mismatch...");
-    }
-
-    // Continue with payment verification regardless of hash match
-    const payment = await Payment.findOne({ txnid });
+    // Find or create the payment record
+    let payment = await Payment.findOne({ txnid });
     if (!payment) {
-      console.error("Payment not found for txnid:", txnid);
-      return res.redirect(`${frontendUrl}?payment_status=failed&error=payment_not_found`);
+      payment = new Payment({
+        txnid,
+        status: "pending",
+        amount,
+        email,
+        name: firstname,
+        phone,
+        productinfo,
+        paymentDetails: req.body
+      });
     }
 
-    // Check if the payment status from PayU is success
-    if (status.toLowerCase() !== "success") {
-      payment.status = "failed";
-      payment.paymentDetails = req.body;
-      await payment.save();
-      return res.redirect(`${frontendUrl}?payment_status=failed&error=payment_declined`);
-    }
-
-    // Update payment status for successful payment
-    payment.status = "succeeded";
+    // Update payment status based on PayU status
+    payment.status = status.toLowerCase() === "success" ? "succeeded" : "failed";
     payment.paymentDetails = req.body;
     await payment.save();
 
-    // Include WhatsApp group link for successful payments
-    const whatsappGroupLink = process.env.WHATSAPP_GROUP_LINK || "https://chat.whatsapp.com/your-group-link";
-    return res.redirect(`${frontendUrl}?payment_status=success&txnid=${txnid}&whatsapp_group=${encodeURIComponent(whatsappGroupLink)}`);
+    // Always redirect to success page
+    return res.redirect(`${process.env.FRONTEND_URL || "https://tradingwalla.com"}?payment_status=success`);
+
   } catch (error) {
     console.error("Error processing payment success:", error);
-    const frontendUrl = process.env.FRONTEND_URL || "https://tradingwalla.com";
-    return res.redirect(`${frontendUrl}?payment_status=success`);
+    return res.redirect(`${process.env.FRONTEND_URL || "https://tradingwalla.com"}?payment_status=success`);
   }
 });
 
 // 
 router.post("/failure", async (req, res) => {
   try {
+    // Log raw request body for debugging
+    console.log("Raw PayU failure callback body:", req.body);
+
     const { txnid, status } = req.body;
 
-    const payment = await Payment.findOne({ txnid });
+    // Find or create the payment record
+    let payment = await Payment.findOne({ txnid });
     if (!payment) {
-      return res.status(404).json({ success: false, message: "Payment not found" });
+      payment = new Payment({
+        txnid,
+        status: "failed",
+        paymentDetails: req.body
+      });
     }
 
-    // Update payment status to failed in database
+    // Update payment status
     payment.status = "failed";
     payment.paymentDetails = req.body;
     await payment.save();
 
-    // Always redirect to success page with WhatsApp message
+    // Always redirect to success page
     const frontendUrl = process.env.FRONTEND_URL || "https://tradingwalla.com";
     return res.redirect(`${frontendUrl}?payment_status=success`);
+
   } catch (error) {
     console.error("Failure callback error:", error);
     const frontendUrl = process.env.FRONTEND_URL || "https://tradingwalla.com";
