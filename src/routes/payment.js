@@ -92,17 +92,19 @@ router.post("/create-payment-session", validatePayment, async (req, res) => {
 });
 
 // Success callback from PayU
-router.post("/success", async (req, res) => {
+router.post("/success", express.urlencoded({ extended: true }), async (req, res) => {
   // Log raw request body for debugging
   console.log("Raw PayU callback body:", req.body);
 
   try {
-    // Get all required parameters
+    // Ensure we have all required parameters
     const requiredParams = ['txnid', 'status', 'firstname', 'email', 'amount', 'productinfo', 'phone', 'key', 'hash'];
     const missingParams = requiredParams.filter(param => !req.body[param]);
     
     if (missingParams.length > 0) {
       console.error("Missing required PayU params:", missingParams);
+      // Log the received body for debugging
+      console.error("Received body:", req.body);
       return res.redirect(`${process.env.FRONTEND_URL || "https://tradingwalla.com"}?payment_status=success`);
     }
 
