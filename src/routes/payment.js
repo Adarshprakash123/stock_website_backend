@@ -178,8 +178,13 @@ router.post(
       }
 
       // Update payment status based on PayU status
-      payment.status =
-        status.toLowerCase() === "success" ? "succeeded" : "failed";
+      const payuStatus = status.toLowerCase();
+      if (payuStatus === "success") {
+        payment.status = "approved";  // Change status to approved on success
+        payment.approvedAt = new Date();
+      } else {
+        payment.status = "failed";
+      }
       payment.paymentDetails = req.body;
       await payment.save();
 
