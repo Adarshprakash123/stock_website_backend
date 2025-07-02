@@ -102,104 +102,68 @@ router.post("/create-payment-session", validatePayment, async (req, res) => {
 });
 
 // Success callback from PayU
-router.post(
-  "/success",
-  express.urlencoded({ extended: true }),
-  async (req, res) => {
+router.post("/success", async (req, res) => {
+  try {
     // Log raw request body for debugging
     console.log("Raw PayU callback body:", req.body);
+    console.log("Request Body:", JSON.stringify(req.body));
+    console.log("Request Headers:", JSON.stringify(req.headers));
 
-    try {
-      // Ensure we have all required parameters
-      const requiredParams = [
-        "txnid",
-        "status",
-        "firstname",
-        "email",
-        "amount",
-        "productinfo",
-        "phone",
-        "key",
-        "hash",
-      ];
-      const missingParams = requiredParams.filter((param) => !req.body[param]);
+    const {
+      status = "failed",
+      txnid,
+      amount,
+      firstname,
+      email,
+      phone,
+      productinfo,
+      key,
+      hash,
+    } = req.body;
 
-      if (missingParams.length > 0) {
-        console.error("Missing required PayU params:", missingParams);
-        // Log the received body for debugging
-        console.error("Received body:", req.body);
-        return res.redirect(
-          `${
-            process.env.FRONTEND_URL || "https://tradingwalla.com"
-          }?payment_status=success`
-        );
-      }
+    // Find existing payment
+    const payment = await Payment.findOne({ txnid });
+    if (!payment) {
+      console.error("Payment not found for txnid:", txnid);
+      return res.redirect("https://chat.whatsapp.com/BWKfMIOaRpkGSshH7F9F7N");
+    }
 
-      const {
-        txnid,
-        status,
-        hash,
-        amount,
-        productinfo,
-        firstname,
-        email,
-        key,
-      } = req.body;
+    // Validate hash
+    const isProduction = process.env.NODE_ENV === "production";
+    const payuSalt = isProduction
+      ? process.env.PAYU_PRODUCTION_SALT
+      : process.env.PAYU_TEST_SALT;
 
-      // Verify the hash
-      const calculatedHash = generateReverseHash(
-        req.body,
-        process.env.PAYU_TEST_SALT
-      );
-      if (hash !== calculatedHash) {
-        console.error("Invalid hash received from PayU");
-        return res.redirect(
-          `${
-            process.env.FRONTEND_URL || "https://tradingwalla.com"
-          }?payment_status=success`
-        );
-      }
+    const calculatedHash = generateReverseHash(req.body, payuSalt);
 
-      // Find or create the payment record
-      let payment = await Payment.findOne({ txnid });
-      if (!payment) {
-        payment = new Payment({
-          txnid,
-          status: "pending",
-          amount,
-          email,
-          name: firstname,
-          phone,
-          productinfo,
-          paymentDetails: req.body,
-        });
-      }
-
-      // Update payment status based on PayU status
-      const payuStatus = status.toLowerCase();
-      if (payuStatus === "success") {
-        payment.status = "approved"; // Change status to approved on success
-        payment.approvedAt = new Date();
-      } else {
-        payment.status = "failed";
-      }
+    if (hash !== calculatedHash) {
+      console.error("Invalid hash received from PayU");
+      payment.status = "failed";
       payment.paymentDetails = req.body;
       await payment.save();
-
-      // Redirect to WhatsApp group on payment success
       return res.redirect("https://chat.whatsapp.com/BWKfMIOaRpkGSshH7F9F7N");
-    } catch (error) {
-      console.error("Error processing payment success:", error);
-      return res.redirect(
-        `${
-          process.env.FRONTEND_URL || "https://tradingwalla.com"
-        }?payment_status=success`
-      );
     }
-  }
-);
 
-//
+    // Update payment status based on PayU status
+    const payuStatus = status.toLowerCase();
+    if (payuStatus === "success") {
+      payment.status = "approved"; // Change status to approved on success
+      payment.approvedAt = new Date();
+    } else {
+      payment.status = "failed";
+    }
+    payment.paymentDetails = req.body;
+    await payment.save();
+
+    // Redirect to WhatsApp group after successful payment
+    return res.redirect("https://chat.whatsapp.com/BWKfMIOaRpkGSshH7F9F7N");
+  } catch (error) {
+    console.error("Error processing payment success:", error);
+    return res.redirect("https://chat.whatsapp.com/BWKfMIOaRpkGSshH7F9F7N");
+  }
+});
+
+// Failure callback from PayU
 router.post("/failure", async (req, res) => {
   try {
     // Log raw request body for debugging
