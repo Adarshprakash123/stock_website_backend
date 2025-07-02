@@ -93,13 +93,11 @@ router.post("/create-payment-session", validatePayment, async (req, res) => {
     });
   } catch (error) {
     console.error("Error creating payment session:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Error creating payment",
-        error: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Error creating payment",
+      error: error.message,
+    });
   }
 });
 
@@ -180,7 +178,7 @@ router.post(
       // Update payment status based on PayU status
       const payuStatus = status.toLowerCase();
       if (payuStatus === "success") {
-        payment.status = "approved";  // Change status to approved on success
+        payment.status = "approved"; // Change status to approved on success
         payment.approvedAt = new Date();
       } else {
         payment.status = "failed";
@@ -188,12 +186,8 @@ router.post(
       payment.paymentDetails = req.body;
       await payment.save();
 
-      // Always redirect to success page
-      return res.redirect(
-        `${
-          process.env.FRONTEND_URL || "https://tradingwalla.com"
-        }?payment_status=success`
-      );
+      // Redirect to WhatsApp group on payment success
+      return res.redirect("https://chat.whatsapp.com/BWKfMIOaRpkGSshH7F9F7N");
     } catch (error) {
       console.error("Error processing payment success:", error);
       return res.redirect(
