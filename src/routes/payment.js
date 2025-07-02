@@ -125,7 +125,7 @@ router.post("/success", async (req, res) => {
     const payment = await Payment.findOne({ txnid });
     if (!payment) {
       console.error("Payment not found for txnid:", txnid);
-      return res.redirect("https://chat.whatsapp.com/BWKfMIOaRpkGSshH7F9F7N");
+      return res.redirect("https://chat.whatsapp.com/IaYRCv0WJ564LdL0HAh83y?mode=ac_c");
     }
 
     // Validate hash
@@ -141,7 +141,7 @@ router.post("/success", async (req, res) => {
       payment.status = "failed";
       payment.paymentDetails = req.body;
       await payment.save();
-      return res.redirect("https://chat.whatsapp.com/BWKfMIOaRpkGSshH7F9F7N");
+      return res.redirect("https://chat.whatsapp.com/IaYRCv0WJ564LdL0HAh83y?mode=ac_c");
     }
 
     // Update payment status based on PayU status
@@ -156,10 +156,10 @@ router.post("/success", async (req, res) => {
     await payment.save();
 
     // Redirect to WhatsApp group after successful payment
-    return res.redirect("https://chat.whatsapp.com/BWKfMIOaRpkGSshH7F9F7N");
+    return res.redirect("https://chat.whatsapp.com/IaYRCv0WJ564LdL0HAh83y?mode=ac_c");
   } catch (error) {
     console.error("Error processing payment success:", error);
-    return res.redirect("https://chat.whatsapp.com/BWKfMIOaRpkGSshH7F9F7N");
+    return res.redirect("https://chat.whatsapp.com/IaYRCv0WJ564LdL0HAh83y?mode=ac_c");
   }
 });
 
